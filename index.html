@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebXR Hand Tracking</title>
+<style>
+  body { margin:0; background:#000; overflow:hidden; cursor:pointer; }
+  #overlay { position:fixed; top:10px; left:10px; z-index:10; color:#0f0; font-family:monospace; font-size:12px; pointer-events:none; }
+  #tap-msg { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-family:sans-serif; font-size:28px; z-index:20; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="out-status">OUT: --</div>
+  <div id="hand-status">Hands: --</div>
+  <div id="fps-status">FPS: --</div>
+</div>
+<div id="tap-msg">TAP ANYWHERE TO START</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.181.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+
+// ============================================================
+//  Where to send hand data. Change this to your destination.
+//  Served over https → use wss://. host == this page's host.
+// ============================================================
+const WS_URL = (location.protocol === "https:" ? "wss:" : "ws:") + "//" + location.host + "/ws";
+
+let ws = null;
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen  = () => document.getElementById("out-status").textContent = "OUT: connected";
+  ws.onclose = () => { document.getElementById("out-status").textContent = "OUT: ..."; setTimeout(connectWS, 2000); };
+}
+
+// Called every frame with the hand data. Send it wherever you like.
+function sendHandData(data) {
+  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(data)); } catch (e) {}
+}
+
+// ---- WebXR hand tracking (the setup that worked on Spectacles) ----
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: false, stencil: false, depth: true,
+  powerPreference: 'high-performance', alpha: true
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 50);
+camera.position.set(0, 1.6, 3);
+scene.add(camera);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+
+// Hidden AR button, triggered by tapping the page. hand-tracking is opt-in.
+const xrButton = ARButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] });
+xrButton.style.display = 'none';
+document.body.appendChild(xrButton);
+document.body.addEventListener('click', () => {
+  document.getElementById("tap-msg").style.display = "none";
+  xrButton.click();
+});
+
+// Raw getHand() — no hand model, just joint data.
+const hand1 = renderer.xr.getHand(0); scene.add(hand1);
+const hand2 = renderer.xr.getHand(1); scene.add(hand2);
+
+// 25 WebXR joint names: wrist + 5 per finger.
+const JOINTS = [
+  "wrist",
+  "thumb-metacarpal","thumb-phalanx-proximal","thumb-phalanx-intermediate","thumb-phalanx-distal","thumb-tip",
+  "index-finger-metacarpal","index-finger-phalanx-proximal","index-finger-phalanx-intermediate","index-finger-phalanx-distal","index-finger-tip",
+  "middle-finger-metacarpal","middle-finger-phalanx-proximal","middle-finger-phalanx-intermediate","middle-finger-phalanx-distal","middle-finger-tip",
+  "ring-finger-metacarpal","ring-finger-phalanx-proximal","ring-finger-phalanx-intermediate","ring-finger-phalanx-distal","ring-finger-tip",
+  "pinky-finger-metacarpal","pinky-finger-phalanx-proximal","pinky-finger-phalanx-intermediate","pinky-finger-phalanx-distal","pinky-finger-tip"
+];
+
+// Extract one hand into { joints:[{pos,rot}|null x25], n }, or null if untracked.
+function getHandData(hand) {
+  if (!hand || !hand.joints) return null;
+  const joints = [];
+  let valid = 0;
+  for (const name of JOINTS) {
+    const j = hand.joints[name];
+    if (j && j.position) {
+      const entry = { pos:[j.position.x, j.position.y, j.position.z] };
+      if (j.quaternion) entry.rot = [j.quaternion.x, j.quaternion.y, j.quaternion.z, j.quaternion.w];
+      joints.push(entry);
+      valid++;
+    } else {
+      joints.push(null);
+    }
+  }
+  return valid > 0 ? { joints, n: valid } : null;
+}
+
+let frameCount = 0, lastFpsTime = performance.now(), lastFpsCount = 0;
+
+renderer.setAnimationLoop((t, xrFrame) => {
+  frameCount++;
+
+  const now = performance.now();
+  if (now - lastFpsTime > 1000) {
+    document.getElementById("fps-status").textContent = "FPS: " + ((frameCount-lastFpsCount)/(now-lastFpsTime)*1000).toFixed(0);
+    lastFpsTime = now; lastFpsCount = frameCount;
+  }
+
+  if (xrFrame) {
+    const data = { frame: frameCount };
+    const l = getHandData(hand1);
+    const r = getHandData(hand2);
+    if (l) data.left = l;
+    if (r) data.right = r;
+
+    document.getElementById("hand-status").textContent = (l?"L:"+l.n:"L:--") + " " + (r?"R:"+r.n:"R:--");
+
+    if (l || r) sendHandData(data);
+  }
+
+  renderer.render(scene, camera);
+});
+
+connectWS();
+</script>
+</body>
+</html>
