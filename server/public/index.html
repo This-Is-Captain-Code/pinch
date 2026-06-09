@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>stackchan · bounties</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+         background: #0b0d12; color: #e6e6ea; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #8a8f9a; margin-bottom: 20px; }
+  .agent { background: #12151c; border: 1px solid #232838; border-radius: 10px;
+           padding: 14px 16px; margin-bottom: 20px; }
+  .agent b { color: #8be9fd; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { background: #1f6feb; color: #fff; border: 0; border-radius: 8px;
+           padding: 8px 14px; font: inherit; cursor: pointer; }
+  button.alt { background: #2b3142; }
+  button.pay { background: #2ea043; }
+  button:disabled { opacity: .4; cursor: default; }
+  input { background: #0b0d12; border: 1px solid #2b3142; color: #e6e6ea;
+          border-radius: 8px; padding: 8px; font: inherit; min-width: 360px; }
+  .card { background: #12151c; border: 1px solid #232838; border-radius: 10px;
+          padding: 14px 16px; margin-bottom: 12px; }
+  .id { color: #8a8f9a; }
+  .amt { color: #f1fa8c; font-weight: 700; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px;
+          font-size: 12px; font-weight: 700; }
+  .OPEN { background: #3b2d00; color: #ffd866; }
+  .CLAIMED { background: #11324a; color: #8be9fd; }
+  .PAID { background: #0f3d1f; color: #6ee787; }
+  .CANCELLED { background: #2b3142; color: #8a8f9a; }
+  a { color: #8be9fd; }
+  .muted { color: #8a8f9a; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>🤖 stackchan bounties</h1>
+  <div class="sub">When the robot is blinded it posts a MON bounty from its own wallet. Help it see, get paid.</div>
+
+  <div class="agent" id="agent">loading agent…</div>
+
+  <div class="row" style="margin-bottom:20px">
+    <button class="alt" onclick="sim('blocked')">⛔ simulate: obstruction detected</button>
+    <button class="alt" onclick="sim('clear')">✅ simulate: obstruction cleared</button>
+    <span class="muted">(stand-ins for the robot's MQTT signals)</span>
+  </div>
+
+  <div id="list"></div>
+
+<script>
+const api = (p, opts) => fetch('/api' + p, opts).then(r => r.json());
+let explorer = '';
+
+async function loadAgent() {
+  const a = await api('/agent');
+  explorer = a.explorer || '';
+  const bal = a.balance ? a.balance.mon : '—';
+  document.getElementById('agent').innerHTML = a.address
+    ? `agent wallet <b>${a.address}</b> · balance <span class="amt">${bal} MON</span>
+       · reward <span class="amt">${a.rewardMon} MON</span>
+       · <a href="${a.addressUrl}" target="_blank">explorer ↗</a>`
+    : `<b>no agent wallet</b> — run <code>npm run gen-wallet</code>, set AGENT_PRIVATE_KEY, fund it, restart.`;
+}
+
+async function sim(kind) { await api('/sim/' + kind, { method: 'POST', headers: {'content-type':'application/json'}, body: '{}' }); refresh(); }
+
+async function claim(id) {
+  const solver = document.getElementById('solver-' + id).value.trim();
+  if (!solver) return alert('paste the solver wallet address first');
+  const r = await api('/bounties/' + id + '/claim', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ solver }) });
+  if (r.error) alert(r.error);
+  refresh();
+}
+
+async function release(id) {
+  const r = await api('/bounties/' + id + '/release', { method:'POST' });
+  if (r.error) alert(r.error);
+  refresh(); loadAgent();
+}
+
+function card(b) {
+  let action = '';
+  if (b.status === 'OPEN')
+    action = `<div class="row" style="margin-top:10px">
+        <input id="solver-${b.id}" placeholder="solver wallet 0x… (the human's address)">
+        <button onclick="claim('${b.id}')">claim job</button></div>`;
+  else if (b.status === 'CLAIMED')
+    action = `<div class="row" style="margin-top:10px">
+        <span class="muted">solver ${b.solver}</span>
+        <button class="pay" onclick="release('${b.id}')">obstruction solved → pay ${b.rewardMon} MON</button></div>`;
+  else if (b.status === 'PAID')
+    action = `<div class="muted" style="margin-top:8px">paid ${b.solver} ·
+        <a href="${b.payTxUrl}" target="_blank">tx ↗</a></div>`;
+  return `<div class="card">
+      <div class="row">
+        <span class="pill ${b.status}">${b.status}</span>
+        <span class="amt">${b.rewardMon} MON</span>
+        <span class="id">#${b.id} · device ${b.deviceHash}</span>
+      </div>${action}</div>`;
+}
+
+async function refresh() {
+  const list = await api('/bounties');
+  document.getElementById('list').innerHTML =
+    list.length ? list.map(card).join('') : '<div class="muted">no bounties yet — simulate an obstruction above.</div>';
+}
+
+loadAgent(); refresh();
+setInterval(() => { refresh(); loadAgent(); }, 4000);
+</script>
+</body>
+</html>

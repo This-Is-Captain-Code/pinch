@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount } from 'wagmi'
 import { Quest } from '../types'
+import { claimBounty, releaseBounty, apiConfigured } from '../lib/api'
 import PanTiltControls from './PanTiltControls'
 import StatusPill from './StatusPill'
 import BountyBadge from './BountyBadge'
@@ -34,22 +36,33 @@ export default function QuestDetail({
   const [claimState, setClaimState] = useState<'idle' | 'claiming' | 'claimed'>(
     quest.status === 'claimed' ? 'claimed' : 'idle'
   )
+  const { address } = useAccount() // connected wallet = where the human gets paid
 
   const isClaimed  = claimState === 'claimed'
   const isResolved = quest.status === 'resolved'
 
-  function handleClaim() {
+  async function handleClaim() {
     if (claimState !== 'idle') return
+    if (apiConfigured && !address) {
+      alert('Connect your wallet first — that’s the address the bounty pays out to.')
+      return
+    }
     setClaimState('claiming')
-    console.log('claim bounty')
-    setTimeout(() => {
-      setClaimState('claimed')
-      onClaim(quest.id)
-    }, 1500)
+    try {
+      if (apiConfigured && address) await claimBounty(quest.id, address)
+    } catch (e) {
+      console.error('claim failed', e)
+    }
+    setClaimState('claimed')
+    onClaim(quest.id)
   }
 
-  function handleResolve() {
-    console.log('mark resolved')
+  async function handleResolve() {
+    try {
+      if (apiConfigured) await releaseBounty(quest.id) // pays the solver on Monad
+    } catch (e) {
+      console.error('release failed', e)
+    }
     onResolve(quest.id)
   }
 

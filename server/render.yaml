@@ -1,0 +1,38 @@
+# Deploy the stackchan bounty agent to Render as an always-on web service.
+# (It can't go on Vercel — it holds persistent MQTT + relay WebSocket
+# connections and in-memory bounty state, which serverless can't keep alive.)
+#
+#   render.com -> New -> Blueprint -> point at this repo (rootDir: server)
+# Then set the secret env vars (AGENT_PRIVATE_KEY, MQTT_*) in the dashboard.
+#
+# NOTE: the free plan spins down on idle, which drops the MQTT/relay
+# connections. Use Starter+ for a live demo so it stays connected.
+services:
+  - type: web
+    name: stackchan-bounty-agent
+    runtime: node
+    rootDir: server
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: AGENT_PRIVATE_KEY        # secret — set in dashboard
+        sync: false
+      - key: RPC_URL
+        value: https://testnet-rpc.monad.xyz
+      - key: CHAIN_ID
+        value: "10143"
+      - key: EXPLORER_URL
+        value: https://testnet.monadscan.com
+      - key: REWARD_MON
+        value: "0.05"
+      - key: RELAY_WS_URL
+        value: wss://hand-tracking-relay.jenil-panchal10.workers.dev/default
+      - key: MQTT_URL                 # set when wiring the live robot broker
+        sync: false
+      - key: DEVICE_HASH
+        sync: false
+      - key: TELEOP_DEVICE_HASH
+        sync: false
+    # Render injects PORT automatically; the server already binds process.env.PORT.

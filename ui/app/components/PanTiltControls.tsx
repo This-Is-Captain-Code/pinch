@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { control } from '../lib/api'
 
 type Direction = 'left' | 'right' | 'up' | 'down'
+
+const STEP = 15 // degrees per press
 
 function Arrow({
   dir,
@@ -49,8 +52,17 @@ function Arrow({
 }
 
 export default function PanTiltControls({ disabled }: { disabled: boolean }) {
+  const [pan, setPan] = useState(90)   // servo degrees, 0-180, centre 90
+  const [tilt, setTilt] = useState(90)
+
   function handle(dir: Direction) {
-    console.log(`pan ${dir}`)
+    let p = pan, t = tilt
+    if (dir === 'left')  p = Math.max(0, pan - STEP)
+    if (dir === 'right') p = Math.min(180, pan + STEP)
+    if (dir === 'up')    t = Math.min(180, tilt + STEP)
+    if (dir === 'down')  t = Math.max(0, tilt - STEP)
+    setPan(p); setTilt(t)
+    control(p, t).catch(() => {}) // -> server -> MQTT cmd -> robot motor
   }
 
   return (

@@ -2,12 +2,35 @@
 
 import { useEffect, useState } from 'react'
 import { Quest, BOUNTIES } from '../types'
+import { fetchQuests, apiConfigured } from '../lib/api'
 import Header from '../components/Header'
 import QuestGrid from '../components/QuestGrid'
 
 export default function BountiesPage() {
-  const [quests] = useState<Quest[]>(BOUNTIES)
+  const [quests, setQuests] = useState<Quest[]>(BOUNTIES)
   const [vrMode, setVrMode] = useState(false)
+
+  // Pull live bounties from the agent server and merge them over the mock
+  // backdrop by name — the real stackchan cell reflects live status/operator,
+  // the other robots stay as demo placeholders. No-ops without the API URL.
+  useEffect(() => {
+    if (!apiConfigured) return
+    let alive = true
+    const load = async () => {
+      try {
+        const live = await fetchQuests()
+        if (!alive || live.length === 0) return
+        const byName = new Map(live.map((q) => [q.name, q]))
+        setQuests(BOUNTIES.map((m) => {
+          const l = byName.get(m.name)
+          return l ? { ...m, ...l, imageUrl: l.imageUrl || m.imageUrl } : m
+        }))
+      } catch { /* keep last good state */ }
+    }
+    load()
+    const t = setInterval(load, 3000)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
 
   useEffect(() => {
     const check = () => { if (window.innerWidth < 768) setVrMode(true) }

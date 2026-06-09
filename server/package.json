@@ -1,0 +1,19 @@
+{
+  "name": "stackchan-bounty-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Server-side agent wallet for stackchan: posts a MON bounty on Monad when the robot is blocked, pays the human who solves it.",
+  "scripts": {
+    "start": "node src/index.js",
+    "gen-wallet": "node scripts/gen-wallet.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "mqtt": "^5.10.1",
+    "viem": "^2.21.55",
+    "ws": "^8.18.0"
+  }
+}
