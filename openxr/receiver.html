@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Tracking Monitor</title>
+<style>
+:root {
+  --bg:    #0b0d10;
+  --panel: #111418;
+  --border:#1e2329;
+  --text:  #c9d1d9;
+  --dim:   #4a5260;
+  --green: #3fb950;
+  --blue:  #58a6ff;
+  --amber: #d29922;
+  --red:   #f85149;
+  --pink:  #e879f9;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--panel); flex-shrink: 0;
+}
+header h1 { font-size: 13px; font-weight: 700; color: #fff; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex-shrink: 0; transition: all 0.3s; }
+.dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.spacer { flex: 1; }
+.chip {
+  padding: 2px 10px; border-radius: 20px; font-size: 11px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--dim);
+}
+.chip.on   { color: var(--green); border-color: #2d5a33; }
+.chip.warn { color: var(--amber); border-color: #5a4220; }
+
+/* ── Main grid: two equal hand panels ── */
+main {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px; background: var(--border);
+  overflow: hidden;
+}
+
+.hand-panel {
+  background: var(--panel); display: flex; flex-direction: column;
+  padding: 14px; gap: 12px; overflow: auto;
+}
+
+.hand-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Canvas ── */
+canvas {
+  width: 100%; aspect-ratio: 1; max-height: 280px; object-fit: contain;
+  background: #0d1117; border-radius: 8px; border: 1px solid var(--border); display: block;
+}
+
+/* ── Coordinate table ── */
+.coord-table {
+  width: 100%; border-collapse: collapse;
+}
+.coord-table thead th {
+  text-align: left; font-size: 10px; color: var(--dim); font-weight: 400;
+  padding: 5px 8px; border-bottom: 1px solid var(--border); letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.coord-table tbody td {
+  padding: 6px 8px; border-bottom: 1px solid #161b22; font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.coord-table tbody tr:last-child td { border-bottom: none; }
+.coord-table tbody tr:hover td { background: #161b22; }
+
+.finger-name { color: var(--blue); font-weight: 600; }
+.finger-name.tip { color: var(--pink); }
+.coord-val   { color: var(--text); }
+.coord-null  { color: var(--dim); }
+
+.pinch-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--dim);
+  transition: all 0.15s;
+}
+.pinch-badge.active { color: var(--green); border-color: #2d5a33; background: #0d2b13; }
+
+/* ── Gesture bar ── */
+.gesture-bar {
+  display: none; /* hidden on small screens, shown on large */
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  main { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot" id="dot"></div>
+  <h1>Hand Tracking Monitor</h1>
+  <span class="chip" id="c-conn">connecting…</span>
+  <span class="chip" id="c-fps">FPS —</span>
+  <div class="spacer"></div>
+  <span class="chip" id="c-left">L: —</span>
+  <span class="chip" id="c-right">R: —</span>
+</header>
+
+<main>
+  <!-- LEFT HAND -->
+  <div class="hand-panel">
+    <div class="hand-title">
+      <span style="color:var(--green)">◆</span> Left Hand
+      <span class="pinch-badge" id="l-pinch" style="margin-left:auto">Pinch: —</span>
+    </div>
+    <canvas id="cv-left" width="300" height="300"></canvas>
+    <table class="coord-table">
+      <thead><tr><th>Finger</th><th>X (m)</th><th>Y (m)</th><th>Z (m)</th></tr></thead>
+      <tbody id="tb-left"></tbody>
+    </table>
+  </div>
+
+  <!-- RIGHT HAND -->
+  <div class="hand-panel">
+    <div class="hand-title">
+      <span style="color:var(--blue)">◆</span> Right Hand
+      <span class="pinch-badge" id="r-pinch" style="margin-left:auto">Pinch: —</span>
+    </div>
+    <canvas id="cv-right" width="300" height="300"></canvas>
+    <table class="coord-table">
+      <thead><tr><th>Finger</th><th>X (m)</th><th>Y (m)</th><th>Z (m)</th></tr></thead>
+      <tbody id="tb-right"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+// ── Relay ────────────────────────────────────────────────────────────────────
+const RELAY_WS = 'wss://hand-tracking-relay.jenil-panchal10.workers.dev/default';
+
+// ── Joint indices ─────────────────────────────────────────────────────────────
+// 0=wrist, 1-5=thumb, 6-10=index, 11-15=middle, 16-20=ring, 21-25=pinky
+const TIPS = { Wrist:0, Thumb:5, Index:10, Middle:15, Ring:20, Pinky:25 };
+const CHAINS = [
+  [0,1,2,3,4,5], [0,6,7,8,9,10], [0,11,12,13,14,15],
+  [0,16,17,18,19,20], [0,21,22,23,24,25],
+];
+const ALL_TIPS = [5,10,15,20,25];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const dist3 = (a, b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+const f = v  => v == null ? null : v.toFixed(4);
+
+function chip(id, text, cls='') {
+  const el = document.getElementById(id);
+  el.textContent = text; el.className = 'chip ' + cls;
+}
+
+// ── Canvas drawing ────────────────────────────────────────────────────────────
+function drawHand(cvs, hand, color) {
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width, H = cvs.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!hand) {
+    ctx.fillStyle = '#252b35';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('not tracked', W/2, H/2);
+    return;
+  }
+
+  const pts = hand.joints.map(j => j?.pos ?? null);
+  const valid = pts.filter(Boolean);
+  if (!valid.length) return;
+
+  let x0=Infinity, x1=-Infinity, y0=Infinity, y1=-Infinity;
+  for (const p of valid) {
+    if (p[0]<x0) x0=p[0]; if (p[0]>x1) x1=p[0];
+    if (p[1]<y0) y0=p[1]; if (p[1]>y1) y1=p[1];
+  }
+  const pad = 24;
+  const s = Math.min((W-pad*2)/Math.max(x1-x0,0.001), (H-pad*2)/Math.max(y1-y0,0.001));
+  const sc = p => p ? [pad+(p[0]-x0)*s, H-pad-(p[1]-y0)*s] : null;
+  const sp = pts.map(sc);
+
+  // Skeleton lines
+  ctx.strokeStyle = color + '55'; ctx.lineWidth = 1.5;
+  for (const chain of CHAINS) {
+    ctx.beginPath(); let started = false;
+    for (const i of chain) {
+      const p = sp[i]; if (!p) { started=false; continue; }
+      started ? ctx.lineTo(p[0],p[1]) : (ctx.moveTo(p[0],p[1]), started=true);
+    }
+    ctx.stroke();
+  }
+
+  // All joints
+  for (let i = 0; i < sp.length; i++) {
+    const p = sp[i]; if (!p) continue;
+    const isTip = ALL_TIPS.includes(i);
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], isTip ? 5 : 2.5, 0, Math.PI*2);
+    ctx.fillStyle = isTip ? '#fff' : color;
+    ctx.fill();
+  }
+
+  // Fingertip labels
+  const labels = ['T','I','M','R','P'];
+  ctx.fillStyle = '#ffffffaa'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+  ALL_TIPS.forEach((ti, i) => {
+    const p = sp[ti]; if (!p) return;
+    ctx.fillText(labels[i], p[0], p[1]-9);
+  });
+}
+
+// ── Coordinate table ──────────────────────────────────────────────────────────
+function buildTable(tbodyId, hand) {
+  const tb = document.getElementById(tbodyId);
+  if (!hand) {
+    tb.innerHTML = `<tr><td colspan="4" class="coord-null" style="padding:10px 8px;text-align:center">not tracked</td></tr>`;
+    return;
+  }
+  const rows = Object.entries(TIPS).map(([name, idx]) => {
+    const j = hand.joints[idx];
+    const isTip = idx !== 0;
+    const cls = isTip ? 'finger-name tip' : 'finger-name';
+    if (!j) return `<tr><td class="${cls}">${name}</td><td class="coord-null" colspan="3">—</td></tr>`;
+    return `<tr>
+      <td class="${cls}">${name}</td>
+      <td class="coord-val">${f(j.pos[0])}</td>
+      <td class="coord-val">${f(j.pos[1])}</td>
+      <td class="coord-val">${f(j.pos[2])}</td>
+    </tr>`;
+  });
+  tb.innerHTML = rows.join('');
+}
+
+// ── Pinch detection ───────────────────────────────────────────────────────────
+function updatePinch(badgeId, hand) {
+  const badge = document.getElementById(badgeId);
+  if (!hand) { badge.textContent = 'Pinch: —'; badge.className = 'pinch-badge'; return; }
+  const a = hand.joints[5]?.pos, b = hand.joints[10]?.pos;
+  if (!a || !b) { badge.textContent = 'Pinch: —'; badge.className = 'pinch-badge'; return; }
+  const d = dist3(a, b);
+  const isPinch = d < 0.03;
+  badge.textContent = `Pinch: ${(d*100).toFixed(1)} cm`;
+  badge.className = 'pinch-badge' + (isPinch ? ' active' : '');
+}
+
+// ── Frame handler ─────────────────────────────────────────────────────────────
+let totalFrames = 0, lastFpsT = Date.now(), lastFpsF = 0;
+
+function onFrame(frame) {
+  totalFrames++;
+  const now = Date.now();
+  if (now - lastFpsT >= 1000) {
+    const fps = ((totalFrames - lastFpsF) / (now - lastFpsT) * 1000) | 0;
+    chip('c-fps', `FPS ${fps}`, fps >= 45 ? 'on' : 'warn');
+    lastFpsT = now; lastFpsF = totalFrames;
+  }
+
+  const L = frame.left  ?? null;
+  const R = frame.right ?? null;
+
+  drawHand(document.getElementById('cv-left'),  L, '#3fb950');
+  drawHand(document.getElementById('cv-right'), R, '#58a6ff');
+
+  buildTable('tb-left',  L);
+  buildTable('tb-right', R);
+
+  updatePinch('l-pinch', L);
+  updatePinch('r-pinch', R);
+
+  chip('c-left',  L ? `L: ${L.n}j` : 'L: —', L ? 'on' : '');
+  chip('c-right', R ? `R: ${R.n}j` : 'R: —', R ? 'on' : '');
+}
+
+// ── WebSocket connection ──────────────────────────────────────────────────────
+function connect() {
+  chip('c-conn', 'connecting…', 'warn');
+  const ws = new WebSocket(RELAY_WS);
+
+  ws.onopen = () => {
+    document.getElementById('dot').classList.add('live');
+    chip('c-conn', 'live', 'on');
+  };
+
+  ws.onmessage = (e) => {
+    try { onFrame(JSON.parse(e.data)); } catch {}
+  };
+
+  ws.onclose = () => {
+    document.getElementById('dot').classList.remove('live');
+    chip('c-conn', 'reconnecting…', 'warn');
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => {};
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+drawHand(document.getElementById('cv-left'),  null, '#3fb950');
+drawHand(document.getElementById('cv-right'), null, '#58a6ff');
+buildTable('tb-left',  null);
+buildTable('tb-right', null);
+connect();
+</script>
+</body>
+</html>
