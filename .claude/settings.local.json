@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \"const w = require\\('next/dist/compiled/webpack/webpack.js'\\); console.log\\(Object.keys\\(w\\).slice\\(0,30\\)\\)\")"
+      "Bash(node -e \"const w = require\\('next/dist/compiled/webpack/webpack.js'\\); console.log\\(Object.keys\\(w\\).slice\\(0,30\\)\\)\")",
+      "mcp__figma__get_design_context",
+      "WebSearch",
+      "WebFetch(domain:unsplash.com)",
+      "WebFetch(domain:commons.wikimedia.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:shop.m5stack.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:upload.wikimedia.org)"
     ]
   }
 }

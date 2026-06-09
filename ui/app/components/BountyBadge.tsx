@@ -30,7 +30,7 @@ export default function BountyBadge({
 
   if (resolved) {
     return (
-      <span style={{ fontSize: large ? 28 : 14, color: '#00ff00', fontWeight: 700 }}>
+      <span style={{ fontSize: large ? 28 : 21, color: '#00ff00', fontWeight: 700 }}>
         ✓ paid
       </span>
     )
@@ -39,7 +39,7 @@ export default function BountyBadge({
   return (
     <span
       className="bounty-mount"
-      style={{ fontSize: large ? 28 : 14, fontWeight: large ? 900 : 400 }}
+      style={{ fontSize: large ? 28 : 21, fontWeight: large ? 900 : 400 }}
     >
       {formatted} MON
     </span>

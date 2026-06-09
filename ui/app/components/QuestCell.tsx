@@ -14,9 +14,12 @@ export default function QuestCell({
 }) {
   const isClaimed = quest.status === 'claimed'
 
-  const cellBg = isClaimed
+  const cellBg = quest.imageUrl
+    ? '#111111'
+    : isClaimed
     ? `color-mix(in srgb, ${accentColor} 50%, #000000)`
     : accentColor
+
 
   const pulseClass = accentColor === '#ff0000' ? 'cell-pulse-red' : 'cell-pulse-blue'
   const labelBg    = vrMode ? 'rgba(0,0,0,0.7)' : '#ffffff'
@@ -41,24 +44,49 @@ export default function QuestCell({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 8,
+          padding: 0,
           position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <span
-          style={{
-            fontFamily: '"Arial Black", Inter, system-ui',
-            fontWeight: 900,
-            fontSize: 'clamp(14px, 2.5vw, 26px)',
-            color: '#ffffff',
-            textTransform: 'uppercase',
-            letterSpacing: '-0.02em',
-            textAlign: 'center',
-            lineHeight: 1.15,
-          }}
-        >
-          {quest.name}
-        </span>
+        {quest.imageUrl ? (
+          <img
+            src={quest.imageUrl}
+            alt={quest.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+              filter: isClaimed ? 'brightness(0.55)' : 'none',
+            }}
+          />
+        ) : quest.iconUrl ? (
+          <img
+            src={quest.iconUrl}
+            alt={quest.name}
+            style={{
+              width: 96,
+              height: 96,
+              opacity: isClaimed ? 0.45 : 1,
+            }}
+          />
+        ) : (
+          <span
+            style={{
+              fontFamily: '"Arial Black", Inter, system-ui',
+              fontWeight: 900,
+              fontSize: 'clamp(14px, 2.5vw, 26px)',
+              color: '#ffffff',
+              textTransform: 'uppercase',
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              lineHeight: 1.15,
+            }}
+          >
+            {quest.name}
+          </span>
+        )}
 
         {isClaimed && (
           <div
@@ -91,7 +119,7 @@ export default function QuestCell({
           minHeight: 28,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 400, textTransform: 'lowercase' }}>
+        <span style={{ fontSize: 20, fontWeight: 400, textTransform: 'lowercase' }}>
           {quest.name}
         </span>
         <BountyBadge amount={quest.bounty} />

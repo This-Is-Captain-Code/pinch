@@ -1,12 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 export default function Home() {
-  const [hoverBounty, setHoverBounty] = useState(false)
-  const [hoverQuest, setHoverQuest] = useState(false)
-
   return (
     <div
       style={{
@@ -14,124 +11,109 @@ export default function Home() {
         background: '#000000',
         display: 'flex',
         flexDirection: 'column',
+        fontFamily: "'Geist', system-ui, sans-serif",
       }}
     >
       {/* header */}
-      <header style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '20px 28px',
+        }}
+      >
         <span
           style={{
-            fontFamily: '"Arial Black", Inter, system-ui',
-            fontWeight: 900,
+            fontFamily: "'Geist', system-ui, sans-serif",
+            fontWeight: 500,
             fontSize: 22,
-            textTransform: 'uppercase',
-            letterSpacing: '-0.03em',
             color: '#ffffff',
+            letterSpacing: '-0.03em',
           }}
         >
           pinch
         </span>
+
+        {/* circle avatar / connect */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <ConnectButton
+            accountStatus="avatar"
+            showBalance={false}
+            chainStatus="none"
+          />
+        </div>
       </header>
 
-      {/* main */}
-      <div
+      {/* two buttons */}
+      <main
         style={{
           flex: 1,
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 0,
-          padding: 20,
+          gap: 12,
+          padding: '16px 28px 28px',
         }}
       >
-        <p
-          style={{
-            fontSize: 12,
-            letterSpacing: '0.2em',
-            color: 'rgba(255,255,255,0.3)',
-            textTransform: 'uppercase',
-            marginBottom: 32,
-          }}
-        >
-          robot fleet · monad testnet
-        </p>
-
-        <div style={{ display: 'flex', gap: 4, width: '100%', maxWidth: 760 }}>
-          <Link
-            href="/bounties"
-            style={{ flex: 1, textDecoration: 'none' }}
-            onMouseEnter={() => setHoverBounty(true)}
-            onMouseLeave={() => setHoverBounty(false)}
+        <Link href="/bounties" style={{ flex: 1, textDecoration: 'none' }}>
+          <div
+            style={{
+              height: '100%',
+              background: '#ffffff',
+              borderRadius: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'opacity 120ms',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.88')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           >
-            <div
+            <span
               style={{
-                background: hoverBounty ? '#ff0000' : '#000000',
-                border: '2px solid #ff0000',
-                color: hoverBounty ? '#000000' : '#ffffff',
-                padding: '48px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                transition: 'background 150ms, color 150ms',
-                cursor: 'pointer',
+                fontFamily: "'Geist', system-ui, sans-serif",
+                fontWeight: 500,
+                fontSize: 48,
+                color: '#000000',
+                letterSpacing: '-0.03em',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span
-                style={{
-                  fontFamily: '"Arial Black", Inter, system-ui',
-                  fontWeight: 900,
-                  fontSize: 'clamp(28px, 4vw, 48px)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '-0.03em',
-                  lineHeight: 1,
-                }}
-              >
-                bounties
-              </span>
-              <span style={{ fontSize: 13, opacity: 0.6, fontWeight: 400 }}>
-                stuck robots · claim &amp; unstick · earn MON
-              </span>
-            </div>
-          </Link>
+              bounties
+            </span>
+          </div>
+        </Link>
 
-          <Link
-            href="/side-quests"
-            style={{ flex: 1, textDecoration: 'none' }}
-            onMouseEnter={() => setHoverQuest(true)}
-            onMouseLeave={() => setHoverQuest(false)}
+        <Link href="/side-quests" style={{ flex: 1, textDecoration: 'none' }}>
+          <div
+            style={{
+              height: '100%',
+              background: '#ffffff',
+              borderRadius: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'opacity 120ms',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.88')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           >
-            <div
+            <span
               style={{
-                background: hoverQuest ? '#3333ee' : '#000000',
-                border: '2px solid #3333ee',
-                color: '#ffffff',
-                padding: '48px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                transition: 'background 150ms',
-                cursor: 'pointer',
+                fontFamily: "'Geist', system-ui, sans-serif",
+                fontWeight: 500,
+                fontSize: 48,
+                color: '#000000',
+                letterSpacing: '-0.03em',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span
-                style={{
-                  fontFamily: '"Arial Black", Inter, system-ui',
-                  fontWeight: 900,
-                  fontSize: 'clamp(28px, 4vw, 48px)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '-0.03em',
-                  lineHeight: 1,
-                }}
-              >
-                side quests
-              </span>
-              <span style={{ fontSize: 13, opacity: 0.6, fontWeight: 400 }}>
-                chores &amp; tasks · complete &amp; earn MON
-              </span>
-            </div>
-          </Link>
-        </div>
-      </div>
+              side quests
+            </span>
+          </div>
+        </Link>
+      </main>
     </div>
   )
 }
