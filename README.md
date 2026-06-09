@@ -1,169 +1,74 @@
-# Pinch — WebXR Hand Tracking for Snap Spectacles
+# pinch
 
-Real-time hand tracking in the Snap Spectacles browser, streamed to any device via a Cloudflare relay. No app install. No pairing. Just open a URL.
+**An agent economy in action — an autonomous robot hits its limits, hires a human, and pays them machine-to-machine onchain.**
 
----
+Stackchan runs on its own until something blocks its camera. When it can't see, it posts a small **bounty from its own wallet** asking for help, shows a "stuck" face, and waits. A human claims the bounty and **teleoperates** stackchan — live hand-tracking from Snap Spectacles drives the robot's pan/tilt — to look past the obstacle. The moment stackchan can see again, the bounty is **released to the operator in MON on [Monad](https://monad.xyz)**, settled onchain. That's the one thing a normal payment rail can't do for an agent that has no credit card — only a wallet.
 
-## Live Links
+Two ways agents pay humans here:
 
-| Page | URL | Description |
-|------|-----|-------------|
-| **AR Sender** | https://openxr-ashen.vercel.app | Open on Spectacles — starts hand tracking |
-| **Monitor / Receiver** | https://openxr-ashen.vercel.app/receiver.html | Open anywhere — live finger coordinates |
+- **Bounties — real-time intervention.** The robot is stuck and pays a human to take control *now* (teleop).
+- **Side Quests — training data.** The robot pays a human to record a first-person demonstration of a task it wants to learn (e.g. "doing the dishes").
 
----
-
-## How It Works
+## The loop
 
 ```
-Snap Spectacles browser          Cloudflare Worker              Any browser / API client
-  pinch-beige.vercel.app   ──►  hand-tracking-relay         ──►  /receiver.html
-      (WebXR sender)           .jenil-panchal10.workers.dev       (live monitor)
-                                   (WebSocket relay)
+stackchan blinded ───MQTT camera_blocked──▶  agent posts a MON bounty from its own wallet
+human opens it, connects wallet ──────────▶  claims it (their address = the payout)
+hand-tracking (Spectacles) ─relay→server─MQTT─▶  stackchan motor.pan/tilt   (teleop)
+stackchan sees again ───MQTT camera_clear──▶  agent pays the operator in MON on Monad  ✓
 ```
 
-1. Open the **AR Sender** on Spectacles and tap **TAP TO START AR**
-2. Grant hand-tracking permission
-3. Open the **Monitor** on any other device — data appears instantly in real time
+## Architecture
 
----
+Four components, each independently deployable:
 
-## API Endpoints
+| Dir | What it is | Stack |
+|-----|------------|-------|
+| **[apps/](apps/)** | The app on the **stackchan robot** (ESP32-S3 / gotchiOS). `obstruction.py` detects a blocked camera, shows the stuck face, posts the bounty over MQTT, and drives the pan/tilt servos from teleop commands. | MicroPython |
+| **[server/](server/)** | The **bounty agent** — holds stackchan's wallet, runs the bounty lifecycle, pays MON on Monad, and bridges the hand-tracking relay → MQTT motor commands. | Node · viem · MQTT |
+| **[ui/](ui/)** | The **operator web app** — bounties grid; connect a wallet; click a bounty to teleop. | Next.js · RainbowKit · wagmi |
+| **[openxr/](openxr/)** | The **teleop transport** — WebXR hand-tracking sender for Snap Spectacles + a Cloudflare relay + a receiver. | WebXR · Three.js · Cloudflare Workers |
 
-All endpoints are public, no authentication needed.
+**How it fits together**
 
-### REST — latest snapshot
-```
-GET https://hand-tracking-relay.jenil-panchal10.workers.dev/default
-```
-Returns the most recent hand frame as JSON. Works with `curl`, `fetch()`, Postman, anything.
+- The robot can't be a WebSocket client, so the **server is the bridge**: it subscribes to the hand-tracking relay and republishes pan/tilt to the device's MQTT `cmd` topic. While stuck, the obstruction app applies those to the motor — and the moving view eventually clears, which triggers the payout.
+- Each robot's identity is `mqtt.hash()` = `SHA256(MAC + salt)[:32]`; the server maps that to the robot's agent wallet.
+- Obstruction detection is free of new firmware: the camera's `motion_detect()` returns a 32×24 luma grid, and a low mean-absolute-deviation (a flat, featureless field) = a covered lens.
+- Payout is a direct MON transfer from the agent wallet to the operator on completion — the agentic rail — settled on **Monad testnet (chain id 10143)**.
 
+## Why Monad
+
+Agents need to pay humans (and each other) with no card and no bank — just a wallet, instantly, onchain. Monad's fast, low-cost EVM settlement makes per-bounty MON micropayments practical. The onchain/wallet side was built with help from [MONSKILLS](https://skills.devnads.com/) (`npx skills add therealharpaljadeja/monskills`).
+
+## Quickstart (local)
+
+**1 — Bounty agent + wallet** ([server/README.md](server/README.md))
 ```bash
-curl https://hand-tracking-relay.jenil-panchal10.workers.dev/default
+cd server && npm install
+npm run gen-wallet          # fund the printed address at https://faucet.monad.xyz
+cp .env.example .env        # paste the key into AGENT_PRIVATE_KEY
+npm start                   # http://localhost:8090  (operator page + API)
 ```
 
-### SSE — real-time stream
-```
-GET https://hand-tracking-relay.jenil-panchal10.workers.dev/default/stream
-```
-Server-Sent Events stream. Each event is one hand frame.
-
-```js
-const es = new EventSource('https://hand-tracking-relay.jenil-panchal10.workers.dev/default/stream');
-es.onmessage = e => {
-  const frame = JSON.parse(e.data);
-  console.log(frame.left.joints[10].pos); // left index fingertip [x, y, z]
-};
-```
-
-### WebSocket — lowest latency
-```
-wss://hand-tracking-relay.jenil-panchal10.workers.dev/default
-```
-Full-duplex. Connect and receive every broadcast frame in real time.
-
-```js
-const ws = new WebSocket('wss://hand-tracking-relay.jenil-panchal10.workers.dev/default');
-ws.onmessage = e => {
-  const frame = JSON.parse(e.data);
-  console.log(frame.right.joints[5].pos); // right thumb tip [x, y, z]
-};
-```
-
----
-
-## Data Format
-
-Each frame:
-```json
-{
-  "frame": 1042,
-  "ts": 17823.4,
-  "left": {
-    "n": 26,
-    "joints": [
-      { "pos": [0.01234, 0.95600, -0.31200], "rot": [0, 0, 0, 1] },
-      ...26 entries (null if untracked)
-    ]
-  },
-  "right": { ... }
-}
-```
-
-### Joint order (0–25)
-
-| Index | Name |
-|-------|------|
-| 0 | Wrist |
-| 1–5 | Thumb (metacarpal → tip) |
-| 6–10 | Index finger (metacarpal → tip) |
-| 11–15 | Middle finger |
-| 16–20 | Ring finger |
-| 21–25 | Pinky finger |
-
-**Key fingertip indices:** Thumb=5, Index=10, Middle=15, Ring=20, Pinky=25
-
-- `pos` — position in metres `[x, y, z]` in the XR session's local reference frame
-- `rot` — rotation as quaternion `[x, y, z, w]`
-- `n` — number of tracked joints for that hand (max 26)
-
----
-
-## Project Structure
-
-```
-openxr/
-├── index.html          # WebXR AR sender (Spectacles page)
-├── receiver.html       # Live monitor dashboard (any browser)
-├── vercel.json         # Vercel static deploy config
-├── _headers            # Cloudflare Pages headers (CORS/COOP)
-├── relay-worker/       # Cloudflare Worker — WebSocket relay + REST + SSE
-│   ├── src/index.js
-│   └── wrangler.toml
-└── relay/              # Alternative Node.js relay (for self-hosting)
-    ├── server.js
-    └── package.json
-```
-
----
-
-## Deploy Your Own
-
-### Front-end (Vercel)
+**2 — Operator UI** ([ui/README.md](ui/README.md))
 ```bash
-cd openxr
-npx vercel --prod
+cd ui && npm install
+echo "NEXT_PUBLIC_API_URL=http://localhost:8090" > .env.local
+npm run dev
 ```
 
-### Relay (Cloudflare Worker — free)
-```bash
-cd openxr/relay-worker
-npx wrangler deploy
-```
+**3 — Teleop transport** ([openxr/README.md](openxr/README.md)) — the relay + sender are already live; open the sender on Spectacles to stream hand-tracking.
 
-### Relay (Node.js self-hosted alternative)
-```bash
-cd openxr/relay
-npm install
-node server.js          # runs on port 8080
-```
+**4 — Robot** — flash `apps/obstruction.py` to the stackchan device. Cover the camera to post a bounty; teleop to clear it; the agent pays the operator.
 
----
+No broker handy? Drive the whole bounty lifecycle without the robot via the operator page or `POST /api/sim/blocked` + `/api/sim/clear` — the MON payout is still a real onchain transaction.
 
-## Gesture Detection (built into receiver)
+## Deploy
 
-| Gesture | Detection method |
-|---------|-----------------|
-| **Pinch** | Distance between thumb tip (joint 5) and index tip (joint 10) < 3 cm |
-| **Point** | Index extended, other fingers curled |
-| **Open hand** | All 5 fingers extended |
-| **Fist** | All 5 fingers curled |
+- **UI → Vercel** (root dir `ui`) — set `NEXT_PUBLIC_API_URL` (the server URL) and `NEXT_PUBLIC_WEBXR_URL`. Live: <https://ui-orpin-xi.vercel.app>
+- **Server → Render** (Blueprint reads [`server/render.yaml`](server/render.yaml)) — set `AGENT_PRIVATE_KEY` + `MQTT_URL`/`DEVICE_HASH`. It can't be serverless: it holds persistent MQTT + relay connections.
+- **Relay → Cloudflare Workers** (`openxr/relay-worker/`) and **Sender → Vercel** (`openxr/`) — see [openxr/README.md](openxr/README.md).
 
----
+## Status
 
-## Tech Stack
-
-- **WebXR Hand Input API** — joint tracking in Spectacles browser
-- **Three.js** — WebXR session + 3D skeleton overlay on the sender
-- **Cloudflare Workers + Durable Objects** — stateful WebSocket relay, free tier
-- **Vercel** — static hosting with HTTPS, free tier
+Hackathon build. Implemented and verified: obstruction detection + stuck face, the `camera_blocked`/`camera_clear` MQTT signals, the agent wallet + MON payout on Monad, and the relay → MQTT → motor teleop bridge. The end-to-end live demo additionally needs the robot's MQTT broker reachable and the agent wallet funded.
