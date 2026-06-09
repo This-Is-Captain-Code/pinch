@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#1a1a1a"/>
+  <rect x="160" y="80" width="80" height="80" rx="8" fill="#333"/>
+  <circle cx="178" cy="104" r="8" fill="#555"/>
+  <circle cx="222" cy="104" r="8" fill="#555"/>
+  <rect x="170" y="128" width="60" height="4" rx="2" fill="#444"/>
+  <rect x="140" y="180" width="120" height="8" rx="2" fill="#222"/>
+  <text x="200" y="260" font-family="monospace" font-size="14" fill="#444" text-anchor="middle">LIVE FEED</text>
+</svg>
