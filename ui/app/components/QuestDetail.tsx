@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Quest } from '../types'
 import { claimBounty, releaseBounty, apiConfigured } from '../lib/api'
-import PanTiltControls from './PanTiltControls'
 import StatusPill from './StatusPill'
 import BountyBadge from './BountyBadge'
 
@@ -23,13 +22,11 @@ const divider = (
 export default function QuestDetail({
   quest,
   accentColor,
-  showPanTilt,
   onClaim,
   onResolve,
 }: {
   quest: Quest
   accentColor: string
-  showPanTilt: boolean
   onClaim: (id: string) => void
   onResolve: (id: string) => void
 }) {
@@ -182,13 +179,6 @@ export default function QuestDetail({
               {claimState === 'claiming' && 'CLAIMING...'}
               {claimState === 'claimed'  && 'CLAIMED'}
             </button>
-            {divider}
-          </>
-        )}
-
-        {showPanTilt && (
-          <>
-            <PanTiltControls disabled={!isClaimed && !isResolved} />
             {divider}
           </>
         )}

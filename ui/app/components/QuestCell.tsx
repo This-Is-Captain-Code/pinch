@@ -7,10 +7,12 @@ export default function QuestCell({
   quest,
   accentColor,
   vrMode,
+  onClick,
 }: {
   quest: Quest
   accentColor: string
   vrMode: boolean
+  onClick?: () => void // set only on the bounties grid (-> WebXR teleop)
 }) {
   const isClaimed = quest.status === 'claimed'
 
@@ -28,6 +30,7 @@ export default function QuestCell({
   return (
     <div
       className={pulseClass}
+      onClick={onClick}
       style={{
         aspectRatio: '4/3',
         background: cellBg,
@@ -35,6 +38,7 @@ export default function QuestCell({
         flexDirection: 'column',
         position: 'relative',
         overflow: 'hidden',
+        cursor: onClick ? 'pointer' : 'default',
       }}
     >
       {/* main area */}

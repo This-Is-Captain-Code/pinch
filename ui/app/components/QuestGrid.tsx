@@ -7,10 +7,12 @@ export default function QuestGrid({
   quests,
   accentColor,
   vrMode,
+  onCellClick,
 }: {
   quests: Quest[]
   accentColor: string
   vrMode: boolean
+  onCellClick?: (quest: Quest) => void // bounties pass this (-> teleop); quests don't
 }) {
   return (
     <div
@@ -28,6 +30,7 @@ export default function QuestGrid({
           quest={quest}
           accentColor={accentColor}
           vrMode={vrMode}
+          onClick={onCellClick ? () => onCellClick(quest) : undefined}
         />
       ))}
     </div>

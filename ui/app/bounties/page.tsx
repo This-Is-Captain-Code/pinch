@@ -1,14 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAccount } from 'wagmi'
 import { Quest, BOUNTIES } from '../types'
-import { fetchQuests, apiConfigured } from '../lib/api'
+import { fetchQuests, claimBounty, apiConfigured } from '../lib/api'
 import Header from '../components/Header'
 import QuestGrid from '../components/QuestGrid'
+
+const WEBXR_URL = process.env.NEXT_PUBLIC_WEBXR_URL || 'https://openxr-ashen.vercel.app'
 
 export default function BountiesPage() {
   const [quests, setQuests] = useState<Quest[]>(BOUNTIES)
   const [vrMode, setVrMode] = useState(false)
+  const { address } = useAccount() // connected wallet = where the operator gets paid
+
+  // Click a bounty -> register the operator's wallet (claim), then hand them
+  // the WebXR teleop page. Steering past the obstacle clears the view, which
+  // auto-pays this wallet on Monad.
+  async function startTeleop(q: Quest) {
+    try { if (apiConfigured && address) await claimBounty(q.id, address) }
+    catch (e) { console.error('claim failed', e) }
+    window.location.href = WEBXR_URL
+  }
 
   // Pull live bounties from the agent server and merge them over the mock
   // backdrop by name — the real stackchan cell reflects live status/operator,
@@ -61,7 +74,7 @@ export default function BountiesPage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: vrMode ? 'transparent' : '#000000' }}>
       <Header backHref="/" vrMode={vrMode} onToggleVR={() => setVrMode((v) => !v)} />
       <div id="quest-grid" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <QuestGrid quests={activeQuests} accentColor="#ff0000" vrMode={vrMode} />
+        <QuestGrid quests={activeQuests} accentColor="#ff0000" vrMode={vrMode} onCellClick={startTeleop} />
       </div>
     </div>
   )
