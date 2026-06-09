@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const w = require\\('next/dist/compiled/webpack/webpack.js'\\); console.log\\(Object.keys\\(w\\).slice\\(0,30\\)\\)\")"
+    ]
+  }
+}
