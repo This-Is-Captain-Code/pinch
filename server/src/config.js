@@ -22,11 +22,11 @@ export const config = {
   deviceHash: e.DEVICE_HASH || '',
 
   // ── teleop: hand-tracking relay -> motor cmd ──
-  relayWsUrl: e.RELAY_WS_URL || 'wss://hand-tracking-relay.jenil-panchal10.workers.dev/default',
+  relayWsUrl: e.RELAY_WS_URL || 'wss://pinch-relay.jenil-panchal10.workers.dev/ws',
   teleopEnabled: bool('TELEOP_ENABLED', true),
   teleopHz: num('TELEOP_HZ', 8),         // max motor updates/sec sent to the device
   teleopHand: e.TELEOP_HAND || 'right',  // which hand drives the head
-  teleopJoint: num('TELEOP_JOINT', 0),   // 0=wrist, 10=index tip (see README joint table)
+  teleopJoint: num('TELEOP_JOINT', 0),   // 0=wrist; fingertips 4/9/14/19/24 (25-joint WebXR order)
   teleopDeviceHash: e.TELEOP_DEVICE_HASH || '', // force a target (else: latest CLAIMED bounty)
   // map hand position (metres, local frame) onto 0..180 deg servo range
   panInMin: num('TELEOP_PAN_IN_MIN', -0.3),

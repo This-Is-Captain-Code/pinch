@@ -3,7 +3,8 @@
 # connections and in-memory bounty state, which serverless can't keep alive.)
 #
 #   render.com -> New -> Blueprint -> point at this repo (rootDir: server)
-# Then set the secret env vars (AGENT_PRIVATE_KEY, MQTT_*) in the dashboard.
+# The ONLY secret you set in the dashboard is AGENT_PRIVATE_KEY — everything
+# else (broker, relay, device hash) is baked in below.
 #
 # NOTE: the free plan spins down on idle, which drops the MQTT/relay
 # connections. Use Starter+ for a live demo so it stays connected.
@@ -28,11 +29,11 @@ services:
       - key: REWARD_MON
         value: "0.05"
       - key: RELAY_WS_URL
-        value: wss://hand-tracking-relay.jenil-panchal10.workers.dev/default
-      - key: MQTT_URL                 # set when wiring the live robot broker
-        sync: false
-      - key: DEVICE_HASH
-        sync: false
+        value: wss://pinch-relay.jenil-panchal10.workers.dev/ws
+      - key: MQTT_URL
+        value: mqtt://broker.emqx.io:1883
+      - key: DEVICE_HASH              # stackchan identity (not secret — derived from MAC)
+        value: df1ca8bb8271ab6d751e6d520e1c8ec3
       - key: TELEOP_DEVICE_HASH
-        sync: false
+        value: df1ca8bb8271ab6d751e6d520e1c8ec3
     # Render injects PORT automatically; the server already binds process.env.PORT.

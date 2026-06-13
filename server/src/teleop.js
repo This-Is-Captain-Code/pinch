@@ -30,6 +30,7 @@ function targetDevice() {
 }
 
 function onFrame(frame) {
+  if (!frame || frame.type === 'status') return; // skip the sender's 1 Hz heartbeats
   frames++;
   const other = config.teleopHand === 'right' ? 'left' : 'right';
   const hand = (frame[config.teleopHand] && frame[config.teleopHand].joints)
