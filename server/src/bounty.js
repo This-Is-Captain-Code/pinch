@@ -9,6 +9,16 @@ import { isAddress, getAddress } from 'viem';
 import * as store from './store.js';
 import { payMon, agentAddress } from './chain.js';
 import { config } from './config.js';
+import * as events from './events.js';
+
+// Clean shape pushed to the website over SSE (matches the UI Quest vocabulary).
+function present(b) {
+  return {
+    id: b.id, name: b.name, deviceHash: b.deviceHash, rewardMon: b.rewardMon,
+    status: b.status === 'OPEN' ? 'available' : b.status === 'CLAIMED' ? 'claimed' : 'resolved',
+    solver: b.solver, payTx: b.payTx, createdAt: b.createdAt,
+  };
+}
 
 // Robot got blocked -> create (or reuse) an OPEN bounty for that device.
 export function createForBlocked(deviceHash) {
@@ -30,6 +40,7 @@ export function createForBlocked(deviceHash) {
   };
   store.add(b);
   console.log(`[bounty] OPEN ${b.id} reward=${b.rewardMon} MON device=${b.deviceHash}`);
+  events.broadcast('obstruction_detected', present(b));   // -> website
   return { bounty: b, reused: false };
 }
 
@@ -44,6 +55,7 @@ export function claim(id, solver) {
   b.claimedAt = Date.now();
   store.update(b);
   console.log(`[bounty] CLAIMED ${b.id} by ${b.solver}`);
+  events.broadcast('bounty_claimed', present(b));
   return b;
 }
 
@@ -62,12 +74,14 @@ export async function settle(b) {
     b.paidAt = Date.now();
     store.update(b);
     console.log(`[bounty] PAID ${b.id} -> ${b.solver} ${b.rewardMon} MON tx=${hash} (${status})`);
+    events.broadcast('bounty_paid', present(b));
     return b;
   }
   if (b.status === 'OPEN') {
     b.status = 'CANCELLED';
     store.update(b);
     console.log(`[bounty] CANCELLED ${b.id} (cleared before anyone claimed)`);
+    events.broadcast('bounty_cancelled', present(b));
     return b;
   }
   return b; // already PAID/CANCELLED

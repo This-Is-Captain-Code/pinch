@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { config, agentEnabled, txUrl, addrUrl } from './config.js';
 import { agentAddress, agentBalance } from './chain.js';
 import { publishAction, publishCmd } from './mqtt.js';
+import * as events from './events.js';
 import * as store from './store.js';
 import * as bounty from './bounty.js';
 
@@ -17,6 +18,17 @@ export function createServer() {
   app.use(express.static(join(__dirname, '..', 'public')));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+  // Real-time push to the website (Server-Sent Events). The frontend opens an
+  // EventSource here and gets {type,bounty} on obstruction_detected / bounty_*.
+  app.get('/api/events', (req, res) => {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    res.write('retry: 3000\n\n: connected\n\n');
+    events.addClient(res);
+    const ka = setInterval(() => { try { res.write(': ka\n\n'); } catch {} }, 25000);
+    req.on('close', () => clearInterval(ka));
+  });
 
   app.get('/api/agent', async (_req, res) => {
     try {
